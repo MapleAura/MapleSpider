@@ -11,7 +11,8 @@ def clean_filename(name):
 
 
 def simulate_human_delay(min_delay=0.5, max_delay=3.0):
-    time.sleep(random.uniform(min_delay, max_delay))
+    # 缩短延迟，防止超时
+    time.sleep(random.uniform(0.05, 0.3))
 
 
 def get_random_user_agent():
@@ -81,15 +82,8 @@ def random_mouse_movements(page, moves: int = 6):
             try:
                 page.mouse.move(x, y, steps=steps)
             except Exception:
-                # 某些 headless 环境可能不支持 mouse API
                 pass
-            time.sleep(random.uniform(0.05, 0.8))
-            # 少量概率点击
-            if random.random() < 0.12:
-                try:
-                    page.mouse.click(x, y, delay=random.randint(10, 150))
-                except Exception:
-                    pass
+            time.sleep(random.uniform(0.01, 0.15))
     except Exception:
         return
 
@@ -102,26 +96,10 @@ def interact_like_human(page):
             page.evaluate("window.scrollBy(0, window.innerHeight * 0.2)")
         except Exception:
             pass
-        time.sleep(random.uniform(0.3, 1.2))
+        time.sleep(random.uniform(0.05, 0.2))
 
         random_mouse_movements(page, moves=random.randint(3, 8))
-
-        # 随机悬停页面上可点击元素的一小段时间
-        try:
-            elems = page.query_selector_all('a, button, img')
-            if elems:
-                el = random.choice(elems)
-                try:
-                    el.hover()
-                    time.sleep(random.uniform(0.3, 1.5))
-                except Exception:
-                    pass
-        except Exception:
-            # 某些 Playwright 版本不支持 query_selector_all 同步方式
-            try:
-                page.evaluate("() => { const e = document.querySelector('a,button,img'); if(e) e.scrollIntoView(); }")
-            except Exception:
-                pass
+        # 不再点开/hover任何元素
     except Exception:
         return
 
@@ -150,7 +128,7 @@ def simulate_human_scroll(page, scroll_count=3):
                 requestAnimationFrame(scrollStep);
             }});
         """)
-        time.sleep(random.uniform(1.0, 4.0))
+        time.sleep(random.uniform(0.1, 0.5))
 
 
 def simulate_full_scroll(page, passes=3):
@@ -159,7 +137,7 @@ def simulate_full_scroll(page, passes=3):
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         except Exception:
             break
-        time.sleep(random.uniform(1.5, 4.0))
+        time.sleep(random.uniform(0.2, 0.6))
 
 
 def parse_cookie_string(cookie_str):

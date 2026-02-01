@@ -13,7 +13,7 @@ logger = logging.getLogger("XHS_Downloader")
 class XHSCrawler(BaseCrawler):
     def __init__(self, user_cookie: str, save_dir: str = 'xhs_images', max_workers: int = 5):
         super().__init__(user_cookie=user_cookie, max_workers=max_workers)
-        self.save_dir = clean_filename(save_dir)
+        self.save_dir = save_dir
         os.makedirs(self.save_dir, exist_ok=True)
 
     def crawl_search(self, search_keyword: str, max_images: int = 100):
@@ -79,7 +79,7 @@ class XHSCrawler(BaseCrawler):
 
             page.on('response', handle_response)
             page.goto(f"https://www.xiaohongshu.com/search_result?keyword={quote(search_keyword)}", timeout=60000)
-            page.wait_for_load_state('networkidle', timeout=30000)
+            page.wait_for_load_state('domcontentloaded')
             time.sleep(random.uniform(1.5, 3.0))
             # 做一些人为交互以降低被检测概率
             try:
@@ -89,10 +89,12 @@ class XHSCrawler(BaseCrawler):
 
             scroll_count = 0
             max_scroll = 200
+            no_new_image_rounds = 0
+            max_no_new_image_rounds = 5  # 连续5次无新增即判定到底
+            last_image_count = 0
 
             while len(self.image_url_set) < max_images and scroll_count < max_scroll:
                 scroll_count += 1
-                # 每次滚动之前或之后做轻量交互
                 try:
                     if random.random() < 0.6:
                         interact_like_human(page)
@@ -134,6 +136,17 @@ class XHSCrawler(BaseCrawler):
                     pass
 
                 logger.info(f"已调度下载数量(去重后): {len(self.image_url_set)}/{max_images}, 滚动次数: {scroll_count}/{max_scroll}")
+
+                # 判断是否到底：连续多次无新增图片
+                if len(self.image_url_set) == last_image_count:
+                    no_new_image_rounds += 1
+                    logger.info(f"本轮无新增图片，连续无新增次数: {no_new_image_rounds}")
+                else:
+                    no_new_image_rounds = 0
+                last_image_count = len(self.image_url_set)
+                if no_new_image_rounds >= max_no_new_image_rounds:
+                    logger.info(f"连续{max_no_new_image_rounds}次无新增图片，判定已到底，提前切换关键词。")
+                    break
 
                 if last_api_base and last_cursor and len(self.image_url_set) < max_images:
                     try:
